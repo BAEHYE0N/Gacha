@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>가챠 룰렛</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 2rem; }
+    canvas { border: 1px solid #ccc; margin-top: 1rem; }
+    input, button { margin: 0.5rem; }
+    #result { margin-top: 1rem; font-size: 1.5rem; font-weight: bold; }
+    #history { margin-top: 1rem; font-size: 1rem; color: #555; }
+    li button { margin-left: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>가챠 룰렛</h1>
+  <div>
+    <input type="text" id="itemName" placeholder="항목 이름">
+    <input type="number" id="itemPercent" placeholder="확률 (%)" min="1" max="100">
+    <button onclick="addItem()">항목 추가</button>
+    <button onclick="clearItems()">초기화</button>
+  </div>
+  <ul id="itemList"></ul>
+  <button onclick="spinWheel()">룰렛 돌리기</button>
+  <canvas id="wheelCanvas" width="300" height="300"></canvas>
+  <div id="result"></div>
+  <div id="history"></div>
+
+  <script>
+    const items = [];
+    const history = [];
+
+    function addItem() {
+      const name = document.getElementById('itemName').value;
+      const percent = parseFloat(document.getElementById('itemPercent').value);
+      if (!name || isNaN(percent) || percent <= 0) return;
+      const total = items.reduce((sum, item) => sum + item.percent, 0) + percent;
+      if (total > 100) {
+        alert('총 확률이 100%를 초과했습니다!');
+        return;
+      }
+      items.push({ name, percent });
+      document.getElementById('itemName').value = '';
+      document.getElementById('itemPercent').value = '';
+      updateItemList();
+      drawWheel();
+    }
+
+    function removeItem(index) {
+      items.splice(index, 1);
+      updateItemList();
+      drawWheel();
+    }
+
+    function editItem(index) {
+      const item = items[index];
+      document.getElementById('itemName').value = item.name;
+      document.getElementById('itemPercent').value = item.percent;
+      items.splice(index, 1);
+      updateItemList();
+      drawWheel();
+    }
+
+    function clearItems() {
+      items.length = 0;
+      updateItemList();
+      drawWheel();
+    }
+
+    function updateItemList() {
+      const list = document.getElementById('itemList');
+      list.innerHTML = '';
+      items.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.textContent = `${item.name}: ${item.percent}%`;
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '수정';
+        editBtn.onclick = () => editItem(index);
+        li.appendChild(editBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '삭제';
+        removeBtn.onclick = () => removeItem(index);
+        li.appendChild(removeBtn);
+
+        list.appendChild(li);
+      });
+    }
+
+    function spinWheel() {
+      if (items.length === 0) return;
+      const canvas = document.getElementById('wheelCanvas');
+      const ctx = canvas.getContext('2d');
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = 140;
+      let startAngle = 0;
+      const totalFrames = 60;
+      let currentFrame = 0;
+
+      const target = Math.random() * 100;
+      let cumulative = 0;
+      let selectedItem = null;
+      for (let item of items) {
+        cumulative += item.percent;
+        if (target <= cumulative) {
+          selectedItem = item;
+          break;
+        }
+      }
+
+      const animate = () => {
+        currentFrame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let angleOffset = (Math.PI * 4 * (1 - Math.cos(Math.PI * currentFrame / totalFrames)) / 2); // ease-out
+        drawWheel(angleOffset);
+        if (currentFrame < totalFrames) {
+          requestAnimationFrame(animate);
+        } else {
+          document.getElementById('result').textContent = `결과: ${selectedItem.name}`;
+          history.push(selectedItem.name);
+          updateHistory();
+        }
+      };
+      animate();
+    }
+
+    function updateHistory() {
+      const historyDiv = document.getElementById('history');
+      historyDiv.textContent = '결과 기록: ' + history.join(', ');
+    }
+
+    function drawWheel(angleOffset = 0) {
+      const canvas = document.getElementById('wheelCanvas');
+      const ctx = canvas.getContext('2d');
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = 140;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      let startAngle = angleOffset;
+      items.forEach((item, index) => {
+        const sliceAngle = (item.percent / 100) * 2 * Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+        ctx.closePath();
+        ctx.fillStyle = `hsl(${(index * 60) % 360}, 70%, 70%)`;
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(startAngle + sliceAngle / 2);
+        ctx.fillText(item.name, 80, 0);
+        ctx.restore();
+        startAngle += sliceAngle;
+      });
+    }
+  </script>
+</body>
+</html>
